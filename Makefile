@@ -1,7 +1,7 @@
 GPP=    g++
 GCC=    gcc
 
-NSLIB = ~/mcs/NSLib/src
+NSLIB = ~/projects/NSLib/
 Analysis = ${NSLIB}/analysis
 Document = ${NSLIB}/document
 Index = ${NSLIB}/index
