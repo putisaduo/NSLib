@@ -9,11 +9,15 @@
 #include <mutex>
 #include <thread>
 
+#include "search/IndexSearcher.h"
+#include "queryParser/QueryParser.h"
+
 #include "Headers.h"
 
 using namespace std;
 using namespace chrono;
 using namespace pion::http;
+using namespace NSLib::queryParser;
 
 namespace UBCService {
 
@@ -53,6 +57,11 @@ public:
   void search();
   void search(Headers header, request_ptr request_ptr,
                       tcp::connection_ptr tcp_conn);
+  void* WSearch(const char* wdir, const char_t* wquery, 
+               const char_t* wfield, const char_t* wgroupby);
+
+  string m_indexBase;
+  IndexSearcher* searcher;
 
   queue<Job> jobQueue;
   mutex queueMutex;
@@ -66,7 +75,6 @@ private:
 private:
   //  :: -------------------------------------------------------------------
   //  :: Data Members
-  string m_indexBase;
   string m_index;
 
   queue<Job> queryQueue;

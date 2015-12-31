@@ -50,7 +50,7 @@ using namespace std;
 namespace NSLib{ namespace store{
 //static util::VoidMap< const char_t*,Directory*> DIRECTORIES(true,util::DELETE_TYPE_DELETE_ARRAY,false,util::DELETE_TYPE_NONE);
 static map< const string,Directory*> DIRECTORIES;
-  static DEFINE_MUTEX(DIRECTORIES_MUTEX);
+static DEFINE_MUTEX(DIRECTORIES_MUTEX);
 
 class FSInputStream:public InputStream {
 protected:
@@ -72,7 +72,6 @@ protected:
   void seekInternal(const long_t position);
   // InputStream methods 
   void readInternal(l_byte_t* b, const int offset, const int len);
-
 };
 
 
@@ -92,9 +91,7 @@ public:
   // Random-access methods 
   void seek(const long_t pos);
   long_t Length();
-
 };
-
 
 class FSDirectory: public Directory{
 private:
@@ -167,7 +164,6 @@ public:
   DEFINE_MUTEX(LOCK_MUTEX);
 };
 
-
 class FSLock:public virtual NSLock{
 public:
   // const char_t* fname;
@@ -177,5 +173,6 @@ public:
   bool obtain();
   void release();
 };
+
 }}
 #endif

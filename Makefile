@@ -13,7 +13,8 @@ Util = ${NSLIB}/util
 # paths for all the header files
 INCL_DIR  = -I /usr/include -I /usr/local/include -I ${NSLIB}
 
-CFLAGS= -fPIC -fexceptions -DNDEBUG -W -O3 -std=c++11 -I $(INCL_DIR)
+#CFLAGS= -fPIC -fexceptions -DNDEBUG -W -O3 -std=c++11 -I $(INCL_DIR)
+CFLAGS= -fPIC -fexceptions -DNDEBUG -W -g -std=c++11 -I $(INCL_DIR)
 
 
 OBJS = NSLib.o StdHeader.o $(Analysis)/StandardTokenizer.o \

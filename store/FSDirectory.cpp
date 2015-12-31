@@ -26,13 +26,16 @@ FSInputStream::FSInputStream(const fchar_t* path)
     _lseek(fhandle, 0, SEEK_SET);
     long l = _read(fhandle, native_buffer, length);
     _close(fhandle);
-    cerr << "@@@@@@        read " << filePath << " " << l << " bytes" 
-         << (long)native_buffer << endl;
     global_input_stream_map[filePath] = native_buffer;
+    cerr << "global_input_stream_map[" << filePath << "] has " << l << " bytes " 
+         << (long)native_buffer << endl;
   } else {
     length = global_file_length[filePath];
     cerr << " FSInputStream " << path << " with " << length << " bytes" << endl;
   }
+  it = global_input_stream_map.find(filePath);
+  if (it==global_input_stream_map.end())
+    cerr << "ERROR: missing " << filePath << " " << length << " bytes" << endl;
 }
 FSInputStream::FSInputStream(FSInputStream& clone):
     InputStream(clone)
@@ -48,16 +51,11 @@ FSInputStream::~FSInputStream(){
 
 InputStream& FSInputStream::clone()
 {
+  cerr << "Clone my BufferLength=" << bufferLength << endl;
   return *new FSInputStream(*this);
 }
 void FSInputStream::close()  {
   InputStream::close();
-  //if (!isClone && fhandle != 0){
-  //  if ( _close(fhandle) != 0 )
-  //    _THROWC( "File IO Close error");
-  //  else
-  //    fhandle = 0;
-  //}
 }
 
 void FSInputStream::seekInternal(const long_t position)  {
@@ -68,33 +66,9 @@ void FSInputStream::readInternal(l_byte_t* b, const int offset, const int len) {
   long_t position = getFilePointer();
   int blen = (std::min)(int(length-position), len);
   l_byte_t* native_buffer = global_input_stream_map[filePath];
-  //cerr << "FSInputStream::readInternal " << filePath << " " << position << ", " << blen 
-  //     << "(" << (long)native_buffer << ")" << (long)b << endl;
+  cerr << "FSInputStream::readInternal " << filePath << " " << position << ", " << blen 
+       << "(" << (long)native_buffer << ")" << (long)b << endl;
   memcpy(b, native_buffer+position, blen);
- ///cerr << "FSInputStream::readInternal " << endl;
-//*/
-/*
-  LOCK_MUTEX(file_mutex);
-  _TRY{
-    //long_t position = getFilePointer();
-  
-    if (position != _tell(fhandle) ) {
-      if ( _lseek(fhandle,position,SEEK_SET) == -1 ){
-        UNLOCK_MUTEX(file_mutex);
-        _THROWC( "File IO Seek error");
-        }
-    }
-    bufferLength = _read(fhandle,b,len);
-    if (bufferLength == 0){
-      UNLOCK_MUTEX(file_mutex);
-      _THROWC( "read past EOF");
-    }
-    if (bufferLength == -1){
-      UNLOCK_MUTEX(file_mutex);
-      _THROWC( "read error");
-    }
-  }_FINALLY( UNLOCK_MUTEX(file_mutex) );
-//*/
 }
 
 FSOutputStream::FSOutputStream(const fchar_t* path){
@@ -102,17 +76,15 @@ FSOutputStream::FSOutputStream(const fchar_t* path){
   //_O_CREAT - Creates and opens new file for writing. Has no effect if file specified by filename exists
   //_O_RANDOM - Specifies that caching is optimized for, but not restricted to, random access from disk. 
   //_O_WRONLY - Opens file for writing only; 
-  if ( util::Misc::dir_Exists(path) ){
+  if ( util::Misc::dir_Exists(path) )
     fhandle  = openFile( path, O_BINARY | O_RANDOM | O_RDWR, _S_IREAD | _S_IWRITE);
-    //_lseek( fhandle, 0L, SEEK_END );
-  }
   else
-    // added by JBP
     fhandle  = openFile( path, O_BINARY | O_CREAT  | O_RANDOM | O_RDWR, _S_IREAD | _S_IWRITE);
 
   if ( fhandle == -1 )
     _THROWC( "File IO Open error");
 }
+
 FSOutputStream::~FSOutputStream(){
   if ( fhandle != 0 ){
     try{
@@ -185,7 +157,6 @@ void FSDirectory::create(){
   if ( !util::Misc::dir_Exists(directory) )
     if ( makeDirectory(directory) == -1 ){
       StringBuffer e(_T("Cannot create directory: "));
-      //e.append(directory);
       UNLOCK_MUTEX(FSDIR_CREATE);
       _THROWX( e.getBuffer() );
     }
@@ -237,7 +208,7 @@ void FSDirectory::create(){
         sprintf(buf, "%s/%s",directory_temp,fl->d_name);
         if ( unlink( buf ) == -1 )
 #endif
-          UNLOCK_MUTEX(FSDIR_CREATE);
+        UNLOCK_MUTEX(FSDIR_CREATE);
         closedir(dir);
         _THROWC( "Couldn't delete file ");
       }
@@ -268,64 +239,10 @@ int FSDirectory::priv_getStat(const fchar_t* name, struct Struct_Stat* ret){
 }
 
 FSDirectory::~FSDirectory(){
-  //DIRECTORIES.remove( (getDirName()));
+  //DIRECTORIES.remove( F_TO_CHAR_T(getDirName()));
   DIRECTORIES.erase( getDirName());
 }
 
-/*
-void FSDirectory::list(char_t**& list, int& size) {
-#ifndef _F_UNICODE
-  DIR* dir = opendir(directory); 
-#else
-  char* directory_temp = util::CharConverter::wideToChar(directory, "8858-1");
-  char* PATH_DELIMITER_temp = util::CharConverter::wideToChar(PATH_DELIMITER, "8859-1");
-  DIR* dir = opendir(directory_temp); 
-#endif
-  struct dirent* fl = readdir(dir);
-  struct Struct_Stat buf;
-  VoidList<fchar_t*> names;
-  
-#ifndef _F_UNICODE
-  fchar_t path[MAX_PATH];
-  fstringCopy(path,directory);
-  fstringCat(path,PATH_DELIMITER);
-  fchar_t* pathP = path + fstringLength(path);
-#else
-  char path[MAX_PATH];
-  strcpy(path,directory_temp);
-  strcat(path,PATH_DELIMITER_temp);
-  char* pathP = path + strlen(path);
-#endif
-
-  while ( fl != NULL ){
-#ifndef _F_UNICODE
-    fstringCat(pathP,fl->d_name);
-    int ret = Cmd_Stat(path,&buf);
-#else
-    strcat(pathP,fl->d_name);
-    int ret = stat(path,&buf);
-#endif
-    if ( buf.st_mode & S_IFDIR ) {
-#ifndef _F_UNICODE
-      names.put( fstringDuplicate(fl->d_name) );
-#else
-      names.put( util::CharConverter::charToWide(fl->d_name, "8859-1") );
-#endif
-      fl = readdir(dir);
-    }
-  }
-  closedir(dir);
-
-  size = names.size();
-  list = new char_t*[size];
-  for ( int i=0;i<size;i++ )
-    list[i] = (names[i]);
-#ifdef _F_UNICODE
-  delete directory_temp;
-  delete PATH_DELIMITER_temp;
-#endif
-}
-*/      
 bool FSDirectory::fileExists(const fchar_t* name){
   fchar_t fl[MAX_PATH];
   priv_getFN(fl, name);
@@ -469,13 +386,7 @@ void FSDirectory::close() {
   LOCK_MUTEX(FSDIR_CLOSE);
   if (--refCount <= 0) {
     LOCK_MUTEX(DIRECTORIES_MUTEX);
-    //Directory* d = DIRECTORIES.get((getDirName()));
-    //if ( d != NULL ){
-      //DIRECTORIES.remove( (getDirName()));
-      //delete d;
-    //}
     Directory* d = DIRECTORIES[getDirName()];
-    //if (DIRECTORIES.count(getDirName())==1) {
     if ( d != NULL ){
       DIRECTORIES.erase( getDirName());
       delete d;
@@ -502,15 +413,12 @@ bool FSLock::obtain() {
     return false;
   }
   
-  int r = openFile(fname,  O_RDWR | O_CREAT, _S_IREAD | _S_IWRITE); //must do this or file will be created Read only  
-
+  int r = openFile(fname,  O_RDWR | O_CREAT, _S_IREAD | _S_IWRITE);
   if ( r == -1 )
     return false;
-  else{
-    _close(r);
-    return true;
-  }
-    
+
+  _close(r);
+  return true;
 }
 void FSLock::release() {
   unlinkFile( fname );

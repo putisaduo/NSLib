@@ -4,8 +4,11 @@
 
 #include <pion/http/response_writer.hpp>
 
+#include <exception>
+
 #include <Encrypt.h>
 #include <NSLib.h>
+#include "analysis/ChineseAnalyzer.h"
 
 #include "Worker.h"
 
@@ -36,6 +39,8 @@ Worker::Worker(std::string indexPath)
   if (indexPath.size() > 0)
     m_indexBase = indexPath;
   m_index = "SearchDB";
+  searcher = new IndexSearcher((m_indexBase + "100").c_str()); 
+  cout << "Searcher initialized." << endl;
   searchThread = new thread(SearchThread, this);
 }
 
@@ -55,6 +60,15 @@ void Worker::search()
   Headers& header = job.header;
   
   high_resolution_clock::time_point _start = high_resolution_clock::now();
+
+  vector<string> databases;
+  char* pch = strtok((char*)(header.database.c_str()),";");
+  while (pch != NULL) {
+    string db = pch;
+    databases.push_back(db);
+    pch = strtok(NULL, ";");
+    cerr << "db: " << db << endl;
+  }
 
   std::string database = header.database.empty()? m_index : header.database;
   std::u16string wquery = header.searchQuery,
@@ -107,7 +121,7 @@ std::string Worker::prv_search(std::string database, std::u16string wquery,
     std::cerr << std::hex << (int)(unsigned char)wq[i] << " ";
   std::cerr << std::endl;
   const char16_t* groupby = wgroupby.size()>0 ? wgroupby.c_str():NULL;
-  void* hits = NSL_WSearch((m_indexBase + database).c_str(), wquery.c_str(), 
+  void* hits = WSearch((m_indexBase + database).c_str(), wquery.c_str(), 
                           wfield.c_str(), groupby);
   if ( hits == NULL )
     result += " 0\"}}]}";
@@ -178,6 +192,45 @@ std::string Worker::prv_search(std::string database, std::u16string wquery,
     ]
   }
   */
+}
+
+void* Worker::WSearch(const char* wdir, const char_t* wquery, 
+                      const char_t* wfield, const char_t* wgroupby)
+{
+  if ( wdir == NULL || wquery == NULL ) return NULL;
+
+  Query* q = NULL;
+  ChineseAnalyzer analyzer;
+
+  try{
+    cerr << endl << " $$$$$$$$$ WSearch: " << wdir << endl;
+    //std::cerr << ws2str(wquery) << endl;
+    QueryParser qp(wfield,analyzer);
+    q = &qp.Parse(wquery);
+  }catch(std::exception e){
+    cerr << endl << "################ parsing error." << e.what() << endl;
+    cerr << "exception caught: " << e.what() << endl;
+  }catch(...){
+    cerr << "exception caught: " << "Unknown error" << endl;
+  }
+
+  Hits* hits = NULL;
+  if ( q != NULL ){
+    try{
+      std::cerr << endl << " $$$$$$$$$ WSearch starts ... " << endl;
+      //IndexSearcher* searcher = new IndexSearcher(wdir);
+      std::cerr << endl << " $$$$$ WSearchng  ... " << endl;
+      hits = &searcher->search(*q, const_cast<char_t*>(wgroupby));
+      std::cerr << endl << " $$$$$$$$$ WSearch done. " << endl;
+    }catch(std::exception e){
+      cerr << "exception caught: " << e.what() << endl;
+    }catch(...){
+      cerr << "exception caught: " << "Unknown error" << endl;
+    }
+  }
+
+  //delete q;
+  return hits;
 }
 
 

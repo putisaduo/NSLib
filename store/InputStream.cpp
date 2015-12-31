@@ -13,7 +13,7 @@ InputStream::InputStream():
   bufferStart(0),
   bufferLength(0),
   bufferPosition(0),
-  //buffer(NULL),
+  buffer(NULL),
   chars(NULL),
   chars_length(0)
 {
@@ -24,16 +24,15 @@ InputStream::InputStream(InputStream& clone):
   bufferStart(clone.bufferStart),
   bufferLength(clone.bufferLength),
   bufferPosition(clone.bufferPosition),
-  //buffer(NULL),
   chars(NULL),
   chars_length(0)
 {
-  //if ( clone.buffer != NULL) {
-  //  buffer = new l_byte_t[bufferLength];
+  if ( clone.buffer != NULL) {
+    cerr << "Clone BufferLength=" << bufferLength << endl;
+    buffer = new l_byte_t[bufferLength];
     NSLib::util::Arrays::arraycopy( clone.buffer, 0, buffer, 0, bufferLength);
-  //}
+  }
 }
-
 
 l_byte_t InputStream::readByte() {
   if (bufferPosition >= bufferLength)
@@ -140,7 +139,6 @@ void InputStream::readChars( char_t* buffer, const int start, const int len) {
     }
 }
 
-
 long_t InputStream::getFilePointer() {
   return bufferStart + bufferPosition;
 }
@@ -164,14 +162,11 @@ long_t InputStream::Length() {
 void InputStream::close(){
   if( chars != NULL ) 
     delete[] chars ; chars = NULL;
-  //if ( buffer != NULL ) 
-  //  delete[] buffer ; buffer = NULL;
   
   bufferLength = 0;
   bufferPosition = 0;
   bufferStart = 0;
 }
-
 
 InputStream::~InputStream(){
   close();
@@ -185,12 +180,8 @@ void InputStream::refill() {
   bufferLength = (int)(end - start);
   if (bufferLength == 0)
     _THROWC( "InputStream read past EOF");
-
-  //if (buffer == NULL){
-  //  buffer = new l_byte_t[NSLIB_STREAM_BUFFER_SIZE];      // allocate buffer lazily
-  //  bufferLength = NSLIB_STREAM_BUFFER_SIZE;
-      //cerr << " buffer initiated " << bufferLength << endl;
-  //}
+  if ( buffer == NULL) 
+    buffer = new l_byte_t[bufferLength];
   readInternal(buffer, 0, bufferLength);
 
   bufferStart = start;
