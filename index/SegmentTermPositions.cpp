@@ -29,7 +29,7 @@ void SegmentTermPositions::seek(TermInfo* ti) {
 void SegmentTermPositions::close() {
   SegmentTermDocs::close();
   proxStream->close();
-  _DELETE( proxStream );
+  //_DELETE( proxStream );
 }
 
 int SegmentTermPositions::nextPosition() {
