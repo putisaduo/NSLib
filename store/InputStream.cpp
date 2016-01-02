@@ -25,12 +25,13 @@ InputStream::InputStream(InputStream& clone):
   bufferLength(clone.bufferLength),
   bufferPosition(clone.bufferPosition),
   chars(NULL),
-  chars_length(0)
+  chars_length(0),
+  filePath(clone.filePath)
 {
-  if ( clone.buffer != NULL) {
+  if ( clone.buffer != NULL && clone.bufferLength>0) {
     cerr << "Clone BufferLength=" << bufferLength << endl;
     buffer = new l_byte_t[bufferLength];
-    NSLib::util::Arrays::arraycopy( clone.buffer, 0, buffer, 0, bufferLength);
+    memcpy(buffer, clone.buffer, sizeof(l_byte_t)*bufferLength);
   }
 }
 
@@ -47,7 +48,6 @@ void InputStream::readBytes(l_byte_t* b, const int offset, const int len){
       b[i + offset] = (l_byte_t)readByte();
   } else {            // read all-at-once
     long_t start = getFilePointer();
-    seekInternal(start);
     readInternal(b, offset, len);
 
     bufferStart = start + len;      // adjust stream variables
@@ -152,7 +152,7 @@ void InputStream::seek(const long_t pos) {
     bufferStart = pos;
     bufferPosition = 0;
     bufferLength = 0;          // trigger refill() on read()
-    seekInternal(pos);
+    seekInternal(0);
   }
 }
 long_t InputStream::Length() {

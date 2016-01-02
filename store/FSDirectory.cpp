@@ -40,7 +40,6 @@ FSInputStream::FSInputStream(const fchar_t* path)
 FSInputStream::FSInputStream(FSInputStream& clone):
     InputStream(clone)
 {
-//    fhandle = clone.fhandle;
   length = clone.length;
   filePath = clone.filePath;
   isClone = true;
@@ -51,14 +50,11 @@ FSInputStream::~FSInputStream(){
 
 InputStream& FSInputStream::clone()
 {
-  cerr << "Clone my BufferLength=" << bufferLength << endl;
+  cerr << filePath << ": Clone my BufferLength=" << bufferLength << endl;
   return *new FSInputStream(*this);
 }
 void FSInputStream::close()  {
   InputStream::close();
-}
-
-void FSInputStream::seekInternal(const long_t position)  {
 }
 
 /** InputStream methods */

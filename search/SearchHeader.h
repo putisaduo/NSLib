@@ -24,8 +24,9 @@ class HitDoc;
 class Hits 
 {
 public:
-  Searcher& searcher; //made public so that NSL_Search can access it from outside
-  private:
+  Searcher& searcher; //made public for NSL_Search
+
+private:
   Query& query;
   const Filter* filter;
   char_t* wgroupby;
@@ -83,13 +84,7 @@ public:
   virtual ~Searcher(){ }
   // Returns the documents matching <code>query</code>.
   Hits& search(Query& query, char_t* wgroupby) {
-    return search(query, NULL, wgroupby);
-  }
-
-  // Returns the documents matching <code>query</code> and
-  //  <code>filter</code>. 
-  Hits& search(Query& query, const Filter* filter, char_t* wgroupby) {
-    return *new Hits(*this, query, filter, wgroupby);
+    return *new Hits(*this, query, NULL, wgroupby);
   }
 
   // Lower-level search API.
@@ -174,7 +169,7 @@ public:
     else
       return false;
   }
-  static Scorer* scorer( Query& query, Searcher& searcher, IndexReader& reader){
+  static Scorer* scorer(Query& query, Searcher& searcher, IndexReader& reader){
     query.prepare(reader);
     float sum = query.sumOfSquaredWeights(searcher);
     float norm = 1.0f / (float)sqrt(sum);

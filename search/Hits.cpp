@@ -45,7 +45,7 @@ Hits::Hits(Searcher& s, Query& q, const Filter* f, char_t* wgroupby):
 
 Hits::~Hits(){
   delete &query;
-  delete &searcher;
+  //delete &searcher;
   //searcher.close();
 }
 

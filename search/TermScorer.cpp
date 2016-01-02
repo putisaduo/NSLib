@@ -25,7 +25,7 @@ TermScorer::TermScorer(TermDocs& td, l_byte_t* _norms, const float w):
   if (pointerMax != 0)
     doc = docs[0];
   else {
-    termDocs.close();          // close stream
+    termDocs.close();     // close stream
     doc = INT_MAX;        // set to sentinel value
   }
 }

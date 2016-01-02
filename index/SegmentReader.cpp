@@ -170,7 +170,7 @@ TermEnum& SegmentReader::getTerms(const Term* t) const {
 }
 
 NSLib::document::Document& SegmentReader::document(const int n) {
-    LOCK_MUTEX(document_LOCK);
+  LOCK_MUTEX(document_LOCK);
   if (isDeleted(n)){
       UNLOCK_MUTEX(document_LOCK);
     _THROWC(  "attempt to access a deleted document" );
@@ -183,8 +183,8 @@ NSLib::document::Document& SegmentReader::document(const int n) {
 
 bool SegmentReader::isDeleted(const int n) {
   static DEFINE_MUTEX(asdf);
-    LOCK_MUTEX(isDeleted_LOCK);
-    bool ret = (deletedDocs != NULL && deletedDocs->get(n));
+  LOCK_MUTEX(isDeleted_LOCK);
+  bool ret = (deletedDocs != NULL && deletedDocs->get(n));
     
   UNLOCK_MUTEX(isDeleted_LOCK);
   return ret;
@@ -204,8 +204,8 @@ int SegmentReader::docFreq(const Term& t) const {
     int ret = ti->docFreq;
     delete ti;
     return ret;
-  }else
-    return 0;
+  }
+  return 0;
 }
 
 int SegmentReader::NumDocs() {
@@ -238,7 +238,7 @@ void SegmentReader::getNorms(const char_t* field, l_byte_t* bytes, const int off
   _TRY {
     _normStream->readBytes(bytes, offset, MaxDoc());
   } _FINALLY (
-      _normStream->close();
+    _normStream->close();
     delete _normStream;
   );
 }
@@ -248,7 +248,8 @@ InputStream* SegmentReader::normStream(const char_t* field) {
   if (norm == NULL)
     return NULL;
 
-  InputStream* result = &norm->in.clone();
+  //InputStream* result = &norm->in.clone();
+  InputStream* result = &norm->in;
   result->seek(0);
   return result;
 }

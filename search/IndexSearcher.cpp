@@ -99,6 +99,7 @@ int IndexSearcher::maxDoc() const {
 TopDocs& IndexSearcher::Search(Query& query, const Filter* filter,
                                const int nDocs, char_t* wgroupby)
 {
+  cerr << "IndexSearcher::Search" << endl;
   Scorer* scorer = Query::scorer(query, *this, reader);
   if (scorer == NULL)
     return *new TopDocs(0, new ScoreDoc*[0], 0, "");

@@ -172,7 +172,8 @@ std::string Worker::prv_search(std::string database, std::u16string wquery,
     }
     result += "]}";
   }
-  NSL_ClearSearch(hits);
+  //NSL_ClearSearch(hits);
+  delete ((Hits*)hits);
 
   return result;
   /*

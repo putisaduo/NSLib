@@ -71,8 +71,8 @@ public:
   bool next();
   int read(const int docs[], const int freqs[]);
 
-  //TODO: The virtual members required in TermPositions are defined in the subclass SegmentTermDocs,
-  //but why is there a compiler error because of this.
+  // The virtual members required in TermPositions are defined in the subclass 
+  //    SegmentTermDocs, but why is there a compiler error because of this.
   void seek(Term* term);
   int Doc() const;
   int Freq() const;
@@ -81,7 +81,6 @@ public:
 
 protected:
   void skippingDoc();
-
 };
 
 
