@@ -8,6 +8,7 @@
 #include <queue>
 #include <mutex>
 #include <thread>
+#include <map>
 
 #include "search/IndexSearcher.h"
 #include "queryParser/QueryParser.h"
@@ -25,7 +26,9 @@ class Worker : public boost::enable_shared_from_this<Worker>
 {
 public:
   //  :: Type Information
-  typedef std::vector<std::string> StringVec;
+  typedef vector<string> StringVec;
+  typedef vector<string>::iterator StrVecIter;
+  typedef vector<std::thread*> ThreadVec;
   typedef boost::shared_ptr<Worker> Pointer;
   typedef struct {
     Headers header;
@@ -35,8 +38,8 @@ public:
 
 
 public:
-  Worker(std::string indexPath);
-  virtual ~Worker() { std::fprintf(stderr, "Exiting"); }
+  Worker(string indexPath);
+  virtual ~Worker() { fprintf(stderr, "Exiting"); }
   
   static string getTimeString() {
     char tmp[100];
@@ -55,27 +58,23 @@ public:
   }
   
   void search();
-  void search(Headers header, request_ptr request_ptr,
-                      tcp::connection_ptr tcp_conn);
-  void* WSearch(const char* wdir, const char_t* wquery, 
-               const char_t* wfield, const char_t* wgroupby);
+  void search(Headers header, request_ptr request_ptr, tcp::connection_ptr tcp_conn);
+  void searchInDatabase(string database, u16string wquery, u16string wfield,
+                    u16string wgroupby, WStringVec& showFields, int numResults);
 
   string m_indexBase;
-  IndexSearcher* searcher;
+  map<string, IndexSearcher*> searcherMap;
+  map<string, string> resultMap;
 
   queue<Job> jobQueue;
   mutex queueMutex;
 
 private:
-  string prv_search(string database, u16string wquery, u16string wfield,
-                    u16string wgroupby, WStringVec& showFields, int numResults);
-
+  void prv_readDatabaseNames();
   void prv_addEscapeChar(char* src, char* des);
 
-private:
-  //  :: -------------------------------------------------------------------
-  //  :: Data Members
   string m_index;
+  StringVec databaseNames;
 
   queue<Job> queryQueue;
   thread* searchThread;

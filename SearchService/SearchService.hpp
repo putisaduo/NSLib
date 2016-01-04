@@ -19,7 +19,7 @@ namespace plugins {     // begin namespace plugins
 class SearchService : public pion::http::plugin_service
 {
 public:
-  SearchService(void) : m_worker(new UBCService::Worker("/home/fzhao/mcs/index/")) {
+  SearchService(void) : m_worker(new UBCService::Worker("/home/index/")) {
     std::cerr << "Loading SearchService." << std::endl;
   }
 

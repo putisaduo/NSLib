@@ -19,11 +19,13 @@
 
 typedef char16_t wchar_t16;
 
+using namespace std;
 using namespace pion;
+using namespace boost::algorithm;
 
 namespace UBCService{
 
-typedef std::vector<std::u16string> WStringVec;
+typedef vector<u16string> WStringVec;
 
 // ---------------------------------------------------------------------------
 // Create a Url Key Value Pair with the following guaranteed:
@@ -65,17 +67,17 @@ struct Headers
   Headers(const pion::http::request_ptr& http_request)
     : creatorIp(prv_getRemoteIp(http_request)),
       userAgent(http_request->get_header(HTTPTypes::HEADER_USER_AGENT)),
-      database(getOptionalParameter<std::string>(http_request, "database", "")),
+      databases(getOptionalParameter<string>(http_request, "databases", "")),
       numResults(getOptionalParameter<int>(http_request, "numResults", 500)),
-      query(getOptionalParameter<std::string>(http_request, "q", ""))
+      query(getOptionalParameter<string>(http_request, "q", ""))
   {
     std::cerr << query << std::endl;
     size_t base64_output_length;
     char* base64_output = Base64::decode(query.c_str(), query.length(), 
                                          base64_output_length);
     for (unsigned int i=0; i<base64_output_length; i++)
-      std::cerr << std::uppercase << std::hex << ((unsigned short)base64_output[i])%256 << " ";
-    std::cerr << std::endl;
+      cerr << uppercase << hex << ((unsigned short)base64_output[i])%256 << " ";
+    cerr << std::endl;
     //Base64 b64;
     //char* base64_output = new char[1024*10];
     //size_t base64_output_length = b64.decode(query.c_str(), query.length(), 
@@ -90,7 +92,7 @@ struct Headers
     *l = '\0';
     searchQuery = (wchar_t16*)f;
     char* str = NSL_wideToChar((wchar_t16*)f);
-    std::cerr << " query is " << str << std::endl;
+    cerr << " query is " << str << std::endl;
     delete str;
     //searchQuery = convert_u16string( (wchar_t16*)f, len);
     
@@ -100,7 +102,7 @@ struct Headers
     *l = '\0';
     field = (wchar_t16*)f;
     str = NSL_wideToChar((wchar_t16*)f);
-    std::cerr << " field is " << str << std::endl;
+    cerr << " field is " << str << std::endl;
     delete str;
     //field = convert_u16string( (wchar_t16*)f, len);
     
@@ -110,7 +112,7 @@ struct Headers
     *l = '\0';
     showfield = (wchar_t16*)f;
     str = NSL_wideToChar((wchar_t16*)f);
-    std::cerr << " showfield is " << str << std::endl;
+    cerr << " showfield is " << str << std::endl;
     delete str;
     //showfield = convert_u16string( (wchar_t16*)f, len);
 
@@ -121,12 +123,13 @@ struct Headers
       buf[len]=0;
       groupby= (wchar_t16*)buf;
       char* str = NSL_wideToChar((wchar_t16*)f);
-      std::cerr << " groupby is " << str << std::endl;
+      cerr << " groupby is " << str << std::endl;
       delete str;
       //groupby = convert_u16string( (wchar_t16*)f, len);
       delete[] buf;
     }
     delete base64_output;
+    boost::split(databaseVec, databases, is_any_of(";"), token_compress_on);
   }
 
   virtual ~Headers()
@@ -138,7 +141,7 @@ public:
                    % creatorIp % userAgent % query);
   }
   
-  void getShowFields(WStringVec& showFields)
+  static void getShowFields(WStringVec& showFields, u16string showfield)
   {
     showFields.clear();
     size_t start = 0;
@@ -198,20 +201,18 @@ private:
 
   // Get the RemoteIP, which is either the X_FORWARDED_FOR or the actual
   // remoteIP of the underlying TCP connection.
-  inline std::string prv_getRemoteIp( const http::request_ptr& http_request)
+  inline string prv_getRemoteIp( const http::request_ptr& http_request)
   {
     // Initialize the remoteIp to that of the remote end of the underlying TCP
     // connection
-    std::string remoteIp(http_request->get_remote_ip().to_string());
+    string remoteIp(http_request->get_remote_ip().to_string());
 
     // Iff there is a non-empty HEADER_X_FORWARDED_FOR header, we may be able
     // to get the actual originating IP address
-    using namespace pion;
-    std::string xForwardedFor(http_request->
-                                get_header(HTTPTypes::HEADER_X_FORWARDED_FOR));
+    string xForwardedFor(http_request->
+                           get_header(HTTPTypes::HEADER_X_FORWARDED_FOR));
     if (! xForwardedFor.empty()) {
-      using namespace boost::algorithm;
-      std::vector<std::string> forwardsVec;
+      vector<string> forwardsVec;
       boost::split(forwardsVec, xForwardedFor, is_any_of(","), token_compress_on);
       
       // take the first IP address in the list, and ensure that it is actually
@@ -234,11 +235,13 @@ public:
   //  :: -------------------------------------------------------------------
   //  :: Data Members
   
-  std::string creatorIp;
-  std::string userAgent;
-  std::string database;
+  string creatorIp;
+  string userAgent;
+  string databases;
+  vector<string> databaseVec;
+
   int numResults;
-  std::string query;
+  string query;
   std::u16string searchQuery;
   std::u16string field;
   std::u16string showfield;

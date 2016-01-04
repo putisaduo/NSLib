@@ -5,6 +5,10 @@
 #include <pion/http/response_writer.hpp>
 
 #include <exception>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <future>
 
 #include <Encrypt.h>
 #include <NSLib.h>
@@ -39,9 +43,26 @@ Worker::Worker(std::string indexPath)
   if (indexPath.size() > 0)
     m_indexBase = indexPath;
   m_index = "SearchDB";
-  searcher = new IndexSearcher((m_indexBase + "100").c_str()); 
-  cout << "Searcher initialized." << endl;
+  
+  prv_readDatabaseNames();
+
+  for (StrVecIter it = databaseNames.begin(); it!=databaseNames.end(); it++) {
+    string database = *it;
+    searcherMap[database] = new IndexSearcher((m_indexBase + database).c_str()); 
+    cout << "Searcher " << database << " initialized." << endl;
+  }
   searchThread = new thread(SearchThread, this);
+}
+
+void Worker::prv_readDatabaseNames()
+{
+  ifstream infile(m_indexBase + "databases.lst");
+
+  string line;
+  while (getline(infile, line)) {
+    cerr << "Find database: " << line << endl;
+    databaseNames.push_back(line);
+  }
 }
 
 void Worker::search(Headers header, request_ptr request_ptr,
@@ -54,83 +75,53 @@ void Worker::search(Headers header, request_ptr request_ptr,
   queueMutex.unlock();
 }   
 
-void Worker::search()
+//string result = prv_search(database, wquery, wfield, wgroupby, showFields, numResults);
+void searcherThread(Worker* worker, string database, u16string wquery, u16string wfield,
+                    u16string wgroupby, u16string showfield, int numResults)
 {
-  Job& job = jobQueue.front(); 
-  Headers& header = job.header;
-  
-  high_resolution_clock::time_point _start = high_resolution_clock::now();
-
-  vector<string> databases;
-  char* pch = strtok((char*)(header.database.c_str()),";");
-  while (pch != NULL) {
-    string db = pch;
-    databases.push_back(db);
-    pch = strtok(NULL, ";");
-    cerr << "db: " << db << endl;
-  }
-
-  std::string database = header.database.empty()? m_index : header.database;
-  std::u16string wquery = header.searchQuery,
-                 wfield = header.field,
-                 wgroupby = header.groupby;
-  int numResults = header.numResults;
   WStringVec showFields;
-  header.getShowFields(showFields);
-  string result = prv_search(database, wquery, wfield, wgroupby, showFields, numResults);
-  
-  cerr << getTimeString() << "writing results" << endl;
-  
-  // Set Content-type to "text/plain" (plain ascii text)
-  response_writer_ptr writer(response_writer::create(job.tcp_conn,
-                                          *job.http_request_ptr,
-                                          boost::bind(&tcp::connection::finish,
-                                          job.tcp_conn)));
-  writer->get_response().set_content_type(http::types::CONTENT_TYPE_TEXT);
-  writer << result << http::types::STRING_CRLF;
-  writer->send();
+  Headers::getShowFields(showFields, showfield);
+  worker->searchInDatabase(database, wquery, wfield, wgroupby, showFields, numResults);
+}
 
-  nanoseconds ns = duration_cast<nanoseconds>(high_resolution_clock::now() - _start);
-  cerr << getTimeString() << "Search succeeded in " << (ns.count() / 1000000) << " ms" << endl;
-
-  queueMutex.lock();
-  jobQueue.pop();
-  queueMutex.unlock();
-} 
-
-std::string Worker::prv_search(std::string database, std::u16string wquery, 
-                           std::u16string wfield, std::u16string wgroupby,
-                           WStringVec& showFields, int numResults)
+void Worker::searchInDatabase(string database, u16string wquery, u16string wfield,
+                    u16string wgroupby, WStringVec& showFields, int numResults)
 {
-  std::string result = "{ \"stat\":[{\"database\":{\"" + database + "\":\"" ;
-  /*
-  char16_t* searchQuery0 = L"(CodePath:(E0001)) AND (FullText:(((\"𪛖\"))))";
-  char16_t* searchQuery1 = L"FullText:\"字彙\"";
-  char16_t* searchQuery = L"Title:\"𪕹\"";
-  */  
-  //char16_t* searchQuery0 = L"(CodePath: (CA02DB000B OR CA02DB0001 OR CA02DB0002 OR CA02DB0003)) AND (FullText: (\"饰\" OR \"飾\") OR (\"飾\") OR (\"餙\"))";
-  //char16_t* searchQuery0 = L"(CodePath: (CA02DB0001 OR CA02DB0002 OR CA02DB0003)) AND (FullText: (\"饰\" OR \"飾\") OR (\"飾\") OR (\"餙\"))";
-  //char16_t* searchQuery0 = L"(CodePath: (CA02DB0002 OR CA02DB0003)) AND (FullText: (\"饰\" OR \"飾\") OR (\"飾\") OR (\"餙\"))";
-  //char16_t* searchQuery0 = L"(CodePath: (CA02DB0003)) AND (FullText: (\"饰\" OR \"飾\") OR (\"飾\") OR (\"餙\"))";
-  //char16_t* searchQuery0 = L"(CodePath: (CA02DB0003)) AND (FullText: (\"饰\" OR \"飾\") OR (\"飾\") OR (\"餙\"))";
-  //wquery = searchQuery0;
-  std::cerr << std::endl << "@@@@@@@@@ Worker::search: "<< database << " "<<std::endl;
+  IndexSearcher* searcher = searcherMap[database];
+  string result = "{ \"stat\":[{\"database\":{\"" + database + "\":\"" ;
+  cerr << std::endl << "@@@@@@@@@ Worker::search: "<< database << " "<<endl;
   int qlen = wquery.length() * sizeof(char16_t);
   char* wq = (char*) wquery.c_str();
   for (int i = 0; i<qlen; i++)
-    std::cerr << std::hex << (int)(unsigned char)wq[i] << " ";
-  std::cerr << std::endl;
-  const char16_t* groupby = wgroupby.size()>0 ? wgroupby.c_str():NULL;
-  void* hits = WSearch((m_indexBase + database).c_str(), wquery.c_str(), 
-                          wfield.c_str(), groupby);
+    cerr << hex << (int)(unsigned char)wq[i] << " ";
+  cerr << endl;
+  
+  Hits* hits = NULL;
+  if ( wquery.length()>0) { 
+    try{
+      Query* q = NULL;
+      ChineseAnalyzer analyzer;
+  
+      cerr << endl << " $$$$$$$$$ WSearch: " << database << endl;
+      QueryParser qp(wfield.c_str(),analyzer);
+      q = &qp.Parse(wquery.c_str());
+      if ( q != NULL ){
+        cerr << endl << " $$$$$ WSearchng  ... " << endl;
+        hits = &searcher->search(*q, const_cast<char_t*>(wgroupby.c_str()));
+        cerr << endl << " $$$$$$$$$ WSearch done. " << endl;
+      }
+    }catch(std::exception e){
+      cerr << endl << "################ parsing error." << e.what() << endl;
+      cerr << "exception caught: " << e.what() << endl;
+    }catch(...){
+      cerr << "exception caught: Unknown error" << endl;
+    }
+  }
+
   if ( hits == NULL )
     result += " 0\"}}]}";
   else {
     const char* groupby_str = NSL_HitGroupby(hits);
-    //"stat"：["database":{"index110":"1500","index100":"36000"},
-    //     "group":{"1928": "39", "1929": "56"}],
-    //"result": 
-    //  [ { "RecordId": "26",
     int count = NSL_HitCount(hits);
     //printf( "     keywords: %s\n", keywords );
     printf( "     query: %hs >>>> found %d results, groupby: %s\n", 
@@ -138,7 +129,6 @@ std::string Worker::prv_search(std::string database, std::u16string wquery,
     result += boost::str(boost::format("%d\"}}, {\"group\":{%s}}],\"result\":[") 
                          % count % groupby_str);
     
-    //char* val = NULL;
     for ( int i = 0; i < (std::min)(numResults, count); i++ ) {
       result += (i==0)? "{" : ",{";
       void* doc = NSL_Hit(hits, i);
@@ -172,10 +162,8 @@ std::string Worker::prv_search(std::string database, std::u16string wquery,
     }
     result += "]}";
   }
-  //NSL_ClearSearch(hits);
   delete ((Hits*)hits);
-
-  return result;
+  resultMap[database] = result;
   /*
   {
     "stat"：["database":{"index110":"1500","index100":"36000"},
@@ -195,45 +183,67 @@ std::string Worker::prv_search(std::string database, std::u16string wquery,
   */
 }
 
-void* Worker::WSearch(const char* wdir, const char_t* wquery, 
-                      const char_t* wfield, const char_t* wgroupby)
+void Worker::search()
 {
-  if ( wdir == NULL || wquery == NULL ) return NULL;
+  Job& job = jobQueue.front(); 
+  Headers& header = job.header;
+  
+  high_resolution_clock::time_point _start = high_resolution_clock::now();
 
-  Query* q = NULL;
-  ChineseAnalyzer analyzer;
-
-  try{
-    cerr << endl << " $$$$$$$$$ WSearch: " << wdir << endl;
-    //std::cerr << ws2str(wquery) << endl;
-    QueryParser qp(wfield,analyzer);
-    q = &qp.Parse(wquery);
-  }catch(std::exception e){
-    cerr << endl << "################ parsing error." << e.what() << endl;
-    cerr << "exception caught: " << e.what() << endl;
-  }catch(...){
-    cerr << "exception caught: " << "Unknown error" << endl;
+  StringVec databases;
+  char* pch = strtok((char*)(header.databases.c_str()),";");
+  while (pch != NULL) {
+    string db = pch;
+    databases.push_back(db);
+    pch = strtok(NULL, ";");
+    cerr << "db: " << db << endl;
   }
 
-  Hits* hits = NULL;
-  if ( q != NULL ){
-    try{
-      std::cerr << endl << " $$$$$$$$$ WSearch starts ... " << endl;
-      //IndexSearcher* searcher = new IndexSearcher(wdir);
-      std::cerr << endl << " $$$$$ WSearchng  ... " << endl;
-      hits = &searcher->search(*q, const_cast<char_t*>(wgroupby));
-      std::cerr << endl << " $$$$$$$$$ WSearch done. " << endl;
-    }catch(std::exception e){
-      cerr << "exception caught: " << e.what() << endl;
-    }catch(...){
-      cerr << "exception caught: " << "Unknown error" << endl;
-    }
+  std::u16string wquery = header.searchQuery,
+                 wfield = header.field,
+                 wgroupby = header.groupby;
+  int numResults = header.numResults;
+
+  ThreadVec pool;
+  string* results = new string[header.databaseVec.size()]; 
+  for (StrVecIter it = header.databaseVec.begin(); it!=header.databaseVec.end(); it++) {
+    string database = *it;
+    if (searcherMap.find(database)==searcherMap.end())
+      continue;
+  
+    std::thread* t = new thread(searcherThread, this,
+                      database, wquery, wfield, wgroupby,
+                      header.showfield, numResults);
+    pool.push_back(t);
   }
 
-  //delete q;
-  return hits;
-}
+  std::this_thread::sleep_for(nanoseconds(1000));
 
+  string result;
+  for(int i = 0; i < (int)pool.size(); i++) {
+    thread *t = pool[i];
+    t->join(); 
+    delete t;
+    result += results[i];
+  }
+  cerr << getTimeString() << "writing results" << endl;
+  
+  // Set Content-type to "text/plain" (plain ascii text)
+  response_writer_ptr writer(response_writer::create(job.tcp_conn,
+                                          *job.http_request_ptr,
+                                          boost::bind(&tcp::connection::finish,
+                                          job.tcp_conn)));
+  writer->get_response().set_content_type(http::types::CONTENT_TYPE_TEXT);
+  writer << result << http::types::STRING_CRLF;
+  writer->send();
+
+  nanoseconds ns = duration_cast<nanoseconds>(high_resolution_clock::now() - _start);
+  cerr << getTimeString() << "Search succeeded in " << (ns.count() / 1000000) << " ms" << endl;
+
+  queueMutex.lock();
+  jobQueue.pop();
+  queueMutex.unlock();
+} 
 
 void Worker::prv_addEscapeChar(char* src, char* des)
 {
