@@ -205,7 +205,8 @@ void Worker::search()
   int numResults = header.numResults;
 
   ThreadVec pool;
-  string* results = new string[header.databaseVec.size()]; 
+  //string* results = new string[header.databaseVec.size()]; 
+  StringVec searchingDBs;
   for (StrVecIter it = header.databaseVec.begin(); it!=header.databaseVec.end(); it++) {
     string database = *it;
     if (searcherMap.find(database)==searcherMap.end())
@@ -215,6 +216,7 @@ void Worker::search()
                       database, wquery, wfield, wgroupby,
                       header.showfield, numResults);
     pool.push_back(t);
+    searchingDBs.push_back(database);
   }
 
   std::this_thread::sleep_for(nanoseconds(1000));
@@ -224,7 +226,7 @@ void Worker::search()
     thread *t = pool[i];
     t->join(); 
     delete t;
-    result += results[i];
+    result += resultMap[searchingDBs[i]];
   }
   cerr << getTimeString() << "writing results" << endl;
   
