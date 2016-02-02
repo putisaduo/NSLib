@@ -37,6 +37,12 @@ void SearchThread(Worker* worker)
   }
 } 
 
+void InitSearchThread(Worker* worker, string database)
+{
+  worker->searcherMap[database] = new IndexSearcher((worker->m_indexBase + database).c_str()); 
+  cout << "Searcher " << database << " initialized." << endl;
+}
+
 Worker::Worker(std::string indexPath)
 {
   m_indexBase = "C:\\index\\";
@@ -46,10 +52,16 @@ Worker::Worker(std::string indexPath)
   
   prv_readDatabaseNames();
 
+  ThreadVec pool;
   for (StrVecIter it = databaseNames.begin(); it!=databaseNames.end(); it++) {
     string database = *it;
-    searcherMap[database] = new IndexSearcher((m_indexBase + database).c_str()); 
-    cout << "Searcher " << database << " initialized." << endl;
+    std::thread* t = new thread(InitSearchThread, this, database);
+    pool.push_back(t);
+  }
+  for(int i = 0; i < (int)pool.size(); i++) {
+    thread *t = pool[i];
+    t->join(); 
+    delete t;
   }
   searchThread = new thread(SearchThread, this);
 }
@@ -88,7 +100,8 @@ void Worker::searchInDatabase(string database, u16string wquery, u16string wfiel
                     u16string wgroupby, WStringVec& showFields, int numResults)
 {
   IndexSearcher* searcher = searcherMap[database];
-  string result = "{ \"stat\":[{\"database\":{\"" + database + "\":\"" ;
+  //string result = "{ \"stat\":[{\"database\":{\"" + database + "\":\"" ;
+  string result = " \"" + database + "\": { \"count\": \"" ;
   cerr << std::endl << "@@@@@@@@@ Worker::search: "<< database << " "<<endl;
   int qlen = wquery.length() * sizeof(char16_t);
   char* wq = (char*) wquery.c_str();
@@ -106,9 +119,9 @@ void Worker::searchInDatabase(string database, u16string wquery, u16string wfiel
       QueryParser qp(wfield.c_str(),analyzer);
       q = &qp.Parse(wquery.c_str());
       if ( q != NULL ){
-        cerr << endl << " $$$$$ WSearchng  ... " << endl;
+        cerr << endl << " $$$$$ WSearchng  ... " << database << endl;
         hits = &searcher->search(*q, const_cast<char_t*>(wgroupby.c_str()));
-        cerr << endl << " $$$$$$$$$ WSearch done. " << endl;
+        cerr << endl << " $$$$$$$$$ WSearch done. " << database << endl;
       }
     }catch(std::exception e){
       cerr << endl << "################ parsing error." << e.what() << endl;
@@ -119,16 +132,19 @@ void Worker::searchInDatabase(string database, u16string wquery, u16string wfiel
   }
 
   if ( hits == NULL )
-    result += " 0\"}}]}";
+    result += "0\"}}";
   else {
     const char* groupby_str = NSL_HitGroupby(hits);
     int count = NSL_HitCount(hits);
-    //printf( "     keywords: %s\n", keywords );
-    printf( "     query: %hs >>>> found %d results, groupby: %s\n", 
-           wquery.c_str(), count, groupby_str);
-    result += boost::str(boost::format("%d\"}}, {\"group\":{%s}}],\"result\":[") 
+    if (count==0)
+      result += "0\"";
+    else {
+      //printf( "     keywords: %s\n", keywords );
+      printf( " %s:: query: %hs >>>> found %d results, groupby: %s\n", 
+             database.c_str(), wquery.c_str(), count, groupby_str);
+      result += boost::str(boost::format("%d\", \"group\":{%s},\"result\":[") 
                          % count % groupby_str);
-    
+    }
     for ( int i = 0; i < (std::min)(numResults, count); i++ ) {
       result += (i==0)? "{" : ",{";
       void* doc = NSL_Hit(hits, i);
@@ -158,9 +174,9 @@ void Worker::searchInDatabase(string database, u16string wquery, u16string wfiel
         firstField = false;
         delete[] showField;
       }
-      result += "}";
+      result += "}]";
     }
-    result += "]}";
+    result += "}";
   }
   delete ((Hits*)hits);
   resultMap[database] = result;
@@ -221,13 +237,16 @@ void Worker::search()
 
   std::this_thread::sleep_for(nanoseconds(1000));
 
-  string result;
+  string result = "{";
   for(int i = 0; i < (int)pool.size(); i++) {
     thread *t = pool[i];
     t->join(); 
     delete t;
+    if (i>0)
+      result += ", ";
     result += resultMap[searchingDBs[i]];
   }
+  result += "}";
   cerr << getTimeString() << "writing results" << endl;
   
   // Set Content-type to "text/plain" (plain ascii text)

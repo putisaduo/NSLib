@@ -62,8 +62,8 @@ void FSInputStream::readInternal(l_byte_t* b, const int offset, const int len) {
   long_t position = getFilePointer();
   int blen = (std::min)(int(length-position), len);
   l_byte_t* native_buffer = global_input_stream_map[filePath];
-  cerr << "FSInputStream::readInternal " << filePath << " " << position << ", " << blen 
-       << "(" << (long)native_buffer << ")" << (long)b << endl;
+  //cerr << "FSInputStream::readInternal " << filePath << " " << position << ", " << blen 
+  //     << "(" << (long)native_buffer << ")" << (long)b << endl;
   memcpy(b, native_buffer+position, blen);
 }
 
