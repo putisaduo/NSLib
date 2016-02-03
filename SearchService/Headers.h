@@ -15,7 +15,7 @@
 
 #include <uchar.h>
 #include <string>
-
+#include <exception>
 
 typedef char16_t wchar_t16;
 
@@ -75,6 +75,12 @@ struct Headers
     size_t base64_output_length;
     char* base64_output = Base64::decode(query.c_str(), query.length(), 
                                          base64_output_length);
+    if (base64_output_length==0 || base64_output==NULL) {
+      delete base64_output;
+      databases.clear();
+      return;
+    }
+   try {
     for (unsigned int i=0; i<base64_output_length; i++)
       cerr << uppercase << hex << ((unsigned short)base64_output[i])%256 << " ";
     cerr << std::endl;
@@ -128,8 +134,12 @@ struct Headers
       //groupby = convert_u16string( (wchar_t16*)f, len);
       delete[] buf;
     }
-    delete base64_output;
     boost::split(databaseVec, databases, is_any_of(";"), token_compress_on);
+   } catch (std::exception& e) {
+    databases.clear();
+    cout << "Standard exception: " << e.what() << endl;
+   }
+   delete base64_output;
   }
 
   virtual ~Headers()
