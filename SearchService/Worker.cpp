@@ -137,46 +137,46 @@ void Worker::searchInDatabase(string database, u16string wquery, u16string wfiel
     const char* groupby_str = NSL_HitGroupby(hits);
     int count = NSL_HitCount(hits);
     if (count==0)
-      result += "0\"";
+      result += "0\"}";
     else {
       //printf( "     keywords: %s\n", keywords );
       printf( " %s:: query: %hs >>>> found %d results, groupby: %s\n", 
              database.c_str(), wquery.c_str(), count, groupby_str);
       result += boost::str(boost::format("%d\", \"group\":{%s},\"result\":[") 
                          % count % groupby_str);
-    }
-    for ( int i = 0; i < (std::min)(numResults, count); i++ ) {
-      result += (i==0)? "{" : ",{";
-      void* doc = NSL_Hit(hits, i);
-      //printf( "     No: %d\n", i );
-
-      bool firstField = true;
-      for(WStringVec::iterator it=showFields.begin(); it!=showFields.end(); it++)
-      {
-        char* showField = NSL_wideToChar(it->c_str());
-      //printf( "%s: %ld\n", showField.c_str(), doc);
-        result += firstField? "" : ",";
-        char16_t* val = NSL_WGet_Field(doc, it->c_str());
-        if (val != NULL) {
-          std::u16string valStr = val;
-          int len = valStr.length() * sizeof(char16_t);
-          size_t base64_output_length;
-          char* base64_output = Base64::encode((const unsigned char*)val, len, 
-                                                base64_output_length);
-          std::string tmp = boost::str(boost::format(" \"%s\":\"%s\"") 
-                                    % showField % base64_output);
-          result += tmp;
-          NSL_WFree_Field(val);
-          delete[] base64_output;
-        } else {
+      for ( int i = 0; i < (std::min)(numResults, count); i++ ) {
+        result += (i==0)? "{" : ",{";
+        void* doc = NSL_Hit(hits, i);
+        //printf( "     No: %d\n", i );
+  
+        bool firstField = true;
+        for(WStringVec::iterator it=showFields.begin(); it!=showFields.end(); it++)
+        {
+          char* showField = NSL_wideToChar(it->c_str());
+        //printf( "%s: %ld\n", showField.c_str(), doc);
+          result += firstField? "" : ",";
+          char16_t* val = NSL_WGet_Field(doc, it->c_str());
+          if (val != NULL) {
+            std::u16string valStr = val;
+            int len = valStr.length() * sizeof(char16_t);
+            size_t base64_output_length;
+            char* base64_output = Base64::encode((const unsigned char*)val, len, 
+                                                  base64_output_length);
+            std::string tmp = boost::str(boost::format(" \"%s\":\"%s\"") 
+                                      % showField % base64_output);
+            result += tmp;
+            NSL_WFree_Field(val);
+            delete[] base64_output;
+          } else {
           result += boost::str(boost::format(" \"%s\":\"\"") % showField);
+          }
+          firstField = false;
+          delete[] showField;
         }
-        firstField = false;
-        delete[] showField;
+        result += "}";
       }
-      result += "}]";
+      result += "]}";
     }
-    result += "}";
   }
   delete ((Hits*)hits);
   resultMap[database] = result;
