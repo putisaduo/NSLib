@@ -71,7 +71,8 @@ Worker::Worker(std::string indexPath)
 
 void Worker::prv_readDatabaseNames()
 {
-  ifstream infile(m_indexBase + "databases.lst");
+  //ifstream infile(m_indexBase + "databases.lst");
+  ifstream infile("databases.lst");
 
   string line;
   while (getline(infile, line)) {
