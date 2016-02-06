@@ -4,6 +4,8 @@
 
 #include <pion/http/response_writer.hpp>
 
+#include <chrono>
+#include <thread>
 #include <exception>
 #include <fstream>
 #include <sstream>
@@ -56,6 +58,7 @@ Worker::Worker(std::string indexPath)
   for (StrVecIter it = databaseNames.begin(); it!=databaseNames.end(); it++) {
     string database = *it;
     std::thread* t = new thread(InitSearchThread, this, database);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     pool.push_back(t);
   }
   for(int i = 0; i < (int)pool.size(); i++) {
