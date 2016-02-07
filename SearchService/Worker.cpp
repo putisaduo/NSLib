@@ -91,48 +91,34 @@ void Worker::search(Headers header, request_ptr request_ptr,
   queueMutex.unlock();
 }   
 
-//string result = prv_search(database, wquery, wfield, wgroupby, showFields, numResults);
-void searcherThread(Worker* worker, string database, u16string wquery, u16string wfield,
+//string result = prv_search(database, wgroupby, showFields, numResults);
+void searcherThread(Worker* worker, string database, Query* query,
                     u16string wgroupby, u16string showfield, int numResults)
 {
   WStringVec showFields;
   Headers::getShowFields(showFields, showfield);
-  worker->searchInDatabase(database, wquery, wfield, wgroupby, showFields, numResults);
+  worker->searchInDatabase(database, query, wgroupby, showFields, numResults);
 }
 
-void Worker::searchInDatabase(string database, u16string wquery, u16string wfield,
+void Worker::searchInDatabase(string database, Query* query,
                     u16string wgroupby, WStringVec& showFields, int numResults)
 {
   IndexSearcher* searcher = searcherMap[database];
   //string result = "{ \"stat\":[{\"database\":{\"" + database + "\":\"" ;
   string result = " \"" + database + "\": { \"count\": \"" ;
   cerr << std::endl << "@@@@@@@@@ Worker::search: "<< database << " "<<endl;
-  int qlen = wquery.length() * sizeof(char16_t);
-  char* wq = (char*) wquery.c_str();
-  for (int i = 0; i<qlen; i++)
-    cerr << hex << (int)(unsigned char)wq[i] << " ";
-  cerr << endl;
-  
   Hits* hits = NULL;
-  if ( wquery.length()>0) { 
-    try{
-      Query* q = NULL;
-      ChineseAnalyzer analyzer;
-  
-      cerr << endl << " $$$$$$$$$ WSearch: " << database << endl;
-      QueryParser qp(wfield.c_str(),analyzer);
-      q = &qp.Parse(wquery.c_str());
-      if ( q != NULL ){
-        cerr << endl << " $$$$$ WSearchng  ... " << database << endl;
-        hits = &searcher->search(*q, const_cast<char_t*>(wgroupby.c_str()));
-        cerr << endl << " $$$$$$$$$ WSearch done. " << database << endl;
-      }
-    }catch(std::exception e){
-      cerr << endl << "################ parsing error." << e.what() << endl;
-      cerr << "exception caught: " << e.what() << endl;
-    }catch(...){
-      cerr << "exception caught: Unknown error" << endl;
+  try{
+    if ( query != NULL ){
+      cerr << endl << " $$$$$ WSearchng  ... " << database << endl;
+      hits = &searcher->search(*query, const_cast<char_t*>(wgroupby.c_str()));
+      cerr << endl << " $$$$$$$$$ WSearch done. " << database << endl;
     }
+  }catch(std::exception e){
+    cerr << endl << "################ parsing error." << e.what() << endl;
+    cerr << "exception caught: " << e.what() << endl;
+  }catch(...){
+    cerr << "exception caught: Unknown error" << endl;
   }
 
   if ( hits == NULL )
@@ -144,8 +130,8 @@ void Worker::searchInDatabase(string database, u16string wquery, u16string wfiel
       result += "0\"}";
     else {
       //printf( "     keywords: %s\n", keywords );
-      printf( " %s:: query: %hs >>>> found %d results, groupby: %s\n", 
-             database.c_str(), wquery.c_str(), count, groupby_str);
+      printf( " %s >>>> found %d results, groupby: %s\n", 
+             database.c_str(), count, groupby_str);
       result += boost::str(boost::format("%d\", \"group\":{%s},\"result\":[") 
                          % count % groupby_str);
       for ( int i = 0; i < (std::min)(numResults, count); i++ ) {
@@ -224,33 +210,50 @@ void Worker::search()
                  wgroupby = header.groupby;
   int numResults = header.numResults;
 
-  ThreadVec pool;
-  //string* results = new string[header.databaseVec.size()]; 
-  StringVec searchingDBs;
-  for (StrVecIter it = header.databaseVec.begin(); it!=header.databaseVec.end(); it++) {
-    string database = *it;
-    if (searcherMap.find(database)==searcherMap.end())
-      continue;
+  int qlen = wquery.length() * sizeof(char16_t);
+  char* wq = (char*) wquery.c_str();
+  for (int i = 0; i<qlen; i++)
+    cerr << hex << (int)(unsigned char)wq[i] << " ";
+  cerr << endl;
   
-    std::thread* t = new thread(searcherThread, this,
-                      database, wquery, wfield, wgroupby,
-                      header.showfield, numResults);
-    pool.push_back(t);
-    searchingDBs.push_back(database);
-  }
-
-  std::this_thread::sleep_for(nanoseconds(1000));
-
   string result = "{";
-  for(int i = 0; i < (int)pool.size(); i++) {
-    thread *t = pool[i];
-    t->join(); 
-    delete t;
-    if (i>0)
-      result += ", ";
-    result += resultMap[searchingDBs[i]];
+  if ( qlen == 0)
+    result += "}";
+  else { 
+    printf( " query: %hs \n", wquery.c_str());
+
+    Query* query = NULL;
+    ChineseAnalyzer analyzer;
+    QueryParser qp(wfield.c_str(),analyzer);
+    query = &qp.Parse(wquery.c_str());
+
+    ThreadVec pool;
+    //string* results = new string[header.databaseVec.size()]; 
+    StringVec searchingDBs;
+    for (StrVecIter it = header.databaseVec.begin(); it!=header.databaseVec.end(); it++) {
+      string database = *it;
+      if (searcherMap.find(database)==searcherMap.end())
+        continue;
+    
+      std::thread* t = new thread(searcherThread, this, database, query,
+                                  wgroupby, header.showfield, numResults);
+      pool.push_back(t);
+      searchingDBs.push_back(database);
+    }
+
+    std::this_thread::sleep_for(nanoseconds(1000));
+
+    for(int i = 0; i < (int)pool.size(); i++) {
+      thread *t = pool[i];
+      t->join(); 
+      delete t;
+      if (i>0)
+        result += ", ";
+      result += resultMap[searchingDBs[i]];
+    }
+    result += "}";
+    delete query;
   }
-  result += "}";
   cerr << getTimeString() << "writing results" << endl;
   
   // Set Content-type to "text/plain" (plain ascii text)
