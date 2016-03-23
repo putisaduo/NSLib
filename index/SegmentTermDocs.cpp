@@ -14,10 +14,10 @@ SegmentTermDocs::SegmentTermDocs(void* Parent):
   doc(0),
   freq(0),
   freqCount(0),
-  //freqStream ( &((SegmentReader*)parent)->freqStream->clone())
-  freqStream ( ((SegmentReader*)parent)->freqStream)
+  freqStream ( &((SegmentReader*)parent)->freqStream->clone())
+  //freqStream ( ((SegmentReader*)parent)->freqStream)
 {
-  freqStream->seek(0); 
+  //freqStream->seek(0); 
 }
 
 SegmentTermDocs::~SegmentTermDocs(){

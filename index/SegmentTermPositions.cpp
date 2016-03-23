@@ -7,12 +7,12 @@ using namespace NSLib::util;
 namespace NSLib{ namespace index{
 SegmentTermPositions::SegmentTermPositions(void* Parent):
   SegmentTermDocs(Parent),
-  //proxStream( &((SegmentReader*)parent)->proxStream->clone() ),
-  proxStream( ((SegmentReader*)parent)->proxStream),
+  proxStream( &((SegmentReader*)parent)->proxStream->clone() ),
+  //proxStream( ((SegmentReader*)parent)->proxStream),
   position(0),
   proxCount(0)
 {
-  proxStream->seek(0);
+  //proxStream->seek(0);
 }
 
 SegmentTermPositions::~SegmentTermPositions(){

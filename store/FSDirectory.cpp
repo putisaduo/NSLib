@@ -50,7 +50,7 @@ FSInputStream::~FSInputStream(){
 
 InputStream& FSInputStream::clone()
 {
-  cerr << filePath << ": Clone my BufferLength=" << bufferLength << endl;
+  //cerr << filePath << ": Clone my BufferLength=" << bufferLength << endl;
   return *new FSInputStream(*this);
 }
 void FSInputStream::close()  {

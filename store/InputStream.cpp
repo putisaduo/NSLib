@@ -13,7 +13,7 @@ InputStream::InputStream():
   bufferStart(0),
   bufferLength(0),
   bufferPosition(0),
-  buffer(NULL),
+  //buffer(NULL),
   chars(NULL),
   chars_length(0)
 {
@@ -30,7 +30,7 @@ InputStream::InputStream(InputStream& clone):
 {
   if ( clone.buffer != NULL && clone.bufferLength>0) {
     cerr << "Clone BufferLength=" << bufferLength << endl;
-    buffer = new l_byte_t[bufferLength];
+    //buffer = new l_byte_t[bufferLength];
     memcpy(buffer, clone.buffer, sizeof(l_byte_t)*bufferLength);
   }
 }
@@ -180,8 +180,8 @@ void InputStream::refill() {
   bufferLength = (int)(end - start);
   if (bufferLength == 0)
     _THROWC( "InputStream read past EOF");
-  if ( buffer == NULL) 
-    buffer = new l_byte_t[bufferLength];
+  //if ( buffer == NULL) 
+  //  buffer = new l_byte_t[bufferLength];
   readInternal(buffer, 0, bufferLength);
 
   bufferStart = start;

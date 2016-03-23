@@ -4,6 +4,7 @@
 #include "Scorer.h"
 #include "Similarity.h"
 
+#include <typeinfo>
 #include <iostream>
 
 using namespace NSLib::util;
@@ -115,12 +116,10 @@ void BucketTable::collectHits(HitCollector& results)
   const int prohibited = scorer.prohibitedMask;
   const float* coord = scorer.coordFactors;
 
-  //cerr << "BucketTable::collectHits " << required << ", " << prohibited << " " << first << endl;
   for (Bucket* bucket = first; bucket!=NULL; bucket = bucket->next) {
     if ((bucket->bits & prohibited) == 0 &&    // check prohibited
         (bucket->bits & required) == required)
     {// check required
-      //cerr << " score[" << bucket->doc << "] = "<< bucket->score << "*" << coord[bucket->coord] << endl;
       results.collect(bucket->doc,      // add to results
                       bucket->score * coord[bucket->coord]);
     }
@@ -149,6 +148,7 @@ void Collector::collect(const int doc, const float score) {
   //if (bucket == NULL)
   //  bucket = new Bucket();
   //table.buckets[i] = bucket;
+  //cerr << "Collector::collect " << doc << " " << score << endl;
       
   if (bucket.doc != doc) {        // invalid bucket
     bucket.doc = doc;        // set doc

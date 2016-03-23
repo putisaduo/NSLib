@@ -52,6 +52,7 @@ SimpleFilteredCollector::SimpleFilteredCollector(BitSet* bs, HitCollector& colle
 }
 
 void SimpleFilteredCollector::collect(const int doc, const float score) {
+  cerr<< score << " " << bits << " collector::collect " << endl;
   if (bits->get(doc)) {      // skip docs not in bits
     results.collect(doc, score);
   }

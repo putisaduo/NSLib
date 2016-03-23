@@ -7,7 +7,8 @@ namespace NSLib{ namespace store{
 
 class InputStream{
 private:
-  l_byte_t* buffer; //array of bytes
+  l_byte_t buffer[NSLIB_STREAM_BUFFER_SIZE]; //array of bytes
+  //l_byte_t* buffer; //array of bytes
   char_t* chars; //array of chars
   int chars_length;
 
